@@ -69,6 +69,12 @@ func TestExpand_Defaults(t *testing.T) {
 	if hc := m.Spec["health_check"].(string); hc != "wget -q -O- http://127.0.0.1:8721/health || exit 1" {
 		t.Errorf("health_check = %q", hc)
 	}
+
+	limits := m.Spec["resources"].(map[string]any)["limits"].(map[string]any)
+
+	if limits["cpu"] != "0.3" || limits["memory"] != "128Mi" {
+		t.Errorf("resources limits = %v, want cpu 0.3 / memory 128Mi", limits)
+	}
 }
 
 func TestExpand_PluginFieldsBecomeEnvAndAreStripped(t *testing.T) {
@@ -110,8 +116,14 @@ func TestExpand_OperatorWins(t *testing.T) {
 		t.Errorf("health_check must follow the operator's port: %v", m.Spec["health_check"])
 	}
 
-	if m.Spec["resources"] == nil {
-		t.Error("standard fields must pass through")
+	limits := m.Spec["resources"].(map[string]any)["limits"].(map[string]any)
+
+	if limits["memory"] != "64Mi" {
+		t.Errorf("the operator's resources must replace the default: %v", limits)
+	}
+
+	if _, ok := limits["cpu"]; ok {
+		t.Errorf("the default is replaced whole, not merged: %v", limits)
 	}
 }
 

@@ -25,10 +25,12 @@ fswapi "plugins" "fswapi" {
   # "hupall" or "uuid_kill" when you need them.
   actions = ["reloadxml"]
 
+  # Default: cpu 0.3, memory 128Mi. This block replaces it whole, so set
+  # both values.
   resources {
     limits {
-      cpu    = "0.2"
-      memory = "64Mi"
+      cpu    = "0.5"
+      memory = "256Mi"
     }
   }
 }

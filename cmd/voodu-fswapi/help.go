@@ -22,7 +22,7 @@ Change a default only when you need to:
   fswapi "plugins" "fswapi" {
     esl     = "host.docker.internal:8021"   # default
     actions = ["reloadxml"]                 # default: none enabled
-    resources { limits { cpu = "0.2", memory = "64Mi" } }
+    resources { limits { cpu = "0.5", memory = "256Mi" } }   # default: 0.3 / 128Mi
   }
 
 Reads:    /overview /status /calls /calls/count /channels /channels/count

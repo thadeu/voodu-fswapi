@@ -103,7 +103,7 @@ fswapi "plugins" "fswapi" {
   actions = ["reloadxml"]                  # default: none enabled
 
   resources {
-    limits { cpu = "0.2", memory = "64Mi" }
+    limits { cpu = "0.5", memory = "256Mi" }   # default: cpu 0.3, memory 128Mi
   }
 }
 ```
@@ -116,7 +116,9 @@ The block **is a deployment spec**: standard fields pass through untouched.
 `expand` overlays only its own concerns, without clobbering yours: the local
 image, `FREESWITCH_API_ADDR` (`0.0.0.0:8721` — **not 8080**, which is already
 used inside the platform), `FREESWITCH_ESL_ADDR` (from `esl`),
-`FREESWITCH_ACTIONS` (from `actions`) and a `/health` check.
+`FREESWITCH_ACTIONS` (from `actions`), a `/health` check and the resource
+limits (`cpu = "0.3"`, `memory = "128Mi"`). A `resources` block replaces the
+default limits whole: set both values when you change one.
 
 | Field | Plugin-only | Meaning |
 | --- | --- | --- |

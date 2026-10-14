@@ -70,6 +70,8 @@ func cmdExpand() error {
 //
 //   - image        → the local tag (operator may override)
 //   - replicas     → 1 (operator may override)
+//   - resources    → limits cpu 0.3, memory 128Mi (operator's block replaces
+//     it whole)
 //   - env          → FREESWITCH_API_ADDR, FREESWITCH_ESL_ADDR (from `esl`),
 //     FREESWITCH_ACTIONS (from `actions`), merged UNDER the operator's env
 //   - health_check → wget /health (operator may override)
@@ -116,6 +118,10 @@ func buildExpand(scope, name string, spec map[string]any) (expandedPayload, erro
 		dep["replicas"] = 1
 	}
 
+	if _, ok := dep["resources"]; !ok {
+		dep["resources"] = defaultResources()
+	}
+
 	env := map[string]any{
 		"FREESWITCH_API_ADDR": api.DefaultAddr,
 		"FREESWITCH_ESL_ADDR": eslAddr,
@@ -139,6 +145,14 @@ func buildExpand(scope, name string, spec map[string]any) (expandedPayload, erro
 	depManifest := manifest{Kind: "deployment", Scope: scope, Name: name, Spec: dep}
 
 	return expandedPayload{Manifests: []manifest{depManifest}}, nil
+}
+
+// defaultResources is a low starting limit: the API holds no state and makes
+// one short ESL connection per request. Raise it with a `resources` block.
+func defaultResources() map[string]any {
+	return map[string]any{
+		"limits": map[string]any{"cpu": "0.3", "memory": "128Mi"},
+	}
 }
 
 func portOf(addr, def string) string {

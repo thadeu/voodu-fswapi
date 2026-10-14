@@ -1,5 +1,5 @@
 name: fswapi
-version: 0.1.0
+version: 0.1.1
 description: >
   Voodu plugin for FreeSWITCH. Installing it runs a small JSON API over
   FreeSWITCH's event socket (mod_event_socket) as the builtin resource

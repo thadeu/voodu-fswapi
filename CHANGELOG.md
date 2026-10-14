@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/). The tag must match
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-14
+
+### Changed
+
+- The API deployment gets default resource limits: `cpu = "0.3"`,
+  `memory = "128Mi"`. A `resources` block in `fswapi "plugins" "fswapi"`
+  replaces them.
+
 ## [0.1.0] - 2026-10-14
 
 ### Added
