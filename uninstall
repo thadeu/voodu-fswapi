@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# uninstall — lifecycle hook run by `voodu plugins:remove fswapi`.
+#
+# Removes what install created: the builtin resource plugins/fswapi (the
+# API), the local API images and the plugin binary. Its config bucket is
+# kept, so a reinstall finds the event_socket password again — remove it with
+# `vd config:unset plugins/fswapi FREESWITCH_ESL_PASSWORD`.
+#
+# FreeSWITCH itself is untouched: this plugin never owned it.
+#
+# Best-effort and idempotent: the controller ignores this hook's exit code,
+# so every step logs and moves on.
+
+set -uo pipefail
+
+PLUGIN_DIR="${VOODU_PLUGIN_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PLUGIN_BIN="$PLUGIN_DIR/bin/voodu-fswapi"
+IMAGE_REPO="voodu-fswapi"
+RESOURCE="plugins/fswapi"
+
+log() { printf '[voodu-fswapi/uninstall] %s\n' "$*"; }
+
+plugin_version() {
+  grep '^version:' "$PLUGIN_DIR/plugin.yml" | awk '{print $2}'
+}
+
+if [ "$(id -u)" -ne 0 ]; then
+  log "must run as root"
+  exit 1
+fi
+
+if [ -n "${VOODU_CONTROLLER_URL:-}" ]; then
+  code="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 120 \
+    -X DELETE "$VOODU_CONTROLLER_URL/resource?scope=plugins&name=fswapi" || true)"
+
+  case "$code" in
+    200) log "deleted $RESOURCE" ;;
+    404) log "$RESOURCE was not running" ;;
+    *) log "could not delete $RESOURCE (HTTP ${code:-none}) — run: vd delete $RESOURCE" >&2 ;;
+  esac
+else
+  log "VOODU_CONTROLLER_URL is not set — run: vd delete $RESOURCE" >&2
+fi
+
+if command -v docker >/dev/null 2>&1; then
+  docker rmi "${IMAGE_REPO}:latest" "${IMAGE_REPO}:$(plugin_version)" >/dev/null 2>&1 \
+    && log "removed the ${IMAGE_REPO} images"
+fi
+
+if [ -f "$PLUGIN_BIN" ]; then
+  rm -f "$PLUGIN_BIN"
+  log "removed $PLUGIN_BIN"
+fi

@@ -1,0 +1,23 @@
+# Compiled binaries
+bin/
+dist/
+*.exe
+*.so
+*.dylib
+
+# Test and coverage artifacts
+coverage.out
+coverage.html
+*.test
+*.prof
+
+# Editor / OS
+.DS_Store
+*.bak
+*.tmp
+*.swp
+.vscode/
+.idea/
+
+# stray root build artifact (Makefile builds to bin/)
+/voodu-fswapi

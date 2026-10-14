@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# install — lifecycle hook run by `voodu plugins:install fswapi` (and on
+# every `voodu plugins:update fswapi`).
+#
+# Three steps:
+#   1. Download the voodu-fswapi plugin binary into
+#      $VOODU_PLUGIN_DIR/bin/voodu-fswapi (the CLI + the API's `serve`).
+#   2. Build the LOCAL API image (binary + Dockerfile.runtime), tagged
+#      voodu-fswapi:latest (what expand references) and
+#      voodu-fswapi:<version> (traceability). No public image.
+#   3. Run the API as the builtin resource plugins/fswapi, through the
+#      controller at $VOODU_CONTROLLER_URL:
+#        - absent  → apply an empty `fswapi` block: every default.
+#        - present → restart it, so it picks up the rebuilt image. Its config
+#          is left alone: it may come from the operator's own
+#          `fswapi "plugins" "fswapi" { ... }`.
+#
+# FreeSWITCH itself is NOT installed here — it is your own statefulset. See
+# the README for what it must expose (mod_event_socket + ACL).
+#
+# Idempotent: safe to run repeatedly.
+
+set -euo pipefail
+
+PLUGIN_DIR="${VOODU_PLUGIN_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+PLUGIN_BIN="$PLUGIN_DIR/bin/voodu-fswapi"
+RELEASE_REPO="${VOODU_FSWAPI_RELEASE_REPO:-thadeu/voodu-fswapi}"
+IMAGE_REPO="voodu-fswapi"
+RESOURCE_SCOPE="plugins"
+RESOURCE_NAME="fswapi"
+
+log() { printf '[voodu-fswapi/install] %s\n' "$*"; }
+
+plugin_version() {
+  grep '^version:' "$PLUGIN_DIR/plugin.yml" | awk '{print $2}'
+}
+
+arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+  esac
+}
+
+install_voodu_fswapi() {
+  local version
+  version="$(plugin_version)"
+
+  if [ -z "$version" ]; then
+    log "could not read version from $PLUGIN_DIR/plugin.yml" >&2
+    exit 1
+  fi
+
+  if [ -x "$PLUGIN_BIN" ] && "$PLUGIN_BIN" --version 2>/dev/null | grep -q "$version"; then
+    log "voodu-fswapi v$version already installed at $PLUGIN_BIN"
+    return
+  fi
+
+  local a
+  a="$(arch)"
+
+  local url="https://github.com/${RELEASE_REPO}/releases/download/v${version}/voodu-fswapi_linux_${a}"
+
+  log "downloading voodu-fswapi v$version ($a) from $url"
+
+  mkdir -p "$(dirname "$PLUGIN_BIN")"
+
+  local tmp
+  tmp="$(mktemp)"
+
+  # Fail fast + loud on blocked/slow egress instead of hanging until the
+  # controller kills the hook mid-download. GitHub redirects release assets
+  # to release-assets.githubusercontent.com — that host must be reachable.
+  if ! curl -fsSL --connect-timeout 10 --max-time 300 \
+       --retry 3 --retry-delay 2 --retry-connrefused "$url" -o "$tmp"; then
+    rm -f "$tmp"
+    log "failed to download voodu-fswapi binary from $url" >&2
+    log "the host must reach github.com AND release-assets.githubusercontent.com" >&2
+    log "(air-gapped? pre-place the binary at $PLUGIN_BIN and re-run install)" >&2
+    exit 1
+  fi
+
+  install -m 0755 "$tmp" "$PLUGIN_BIN"
+  rm -f "$tmp"
+
+  log "installed $PLUGIN_BIN"
+}
+
+build_api_image() {
+  local version
+  version="$(plugin_version)"
+
+  if ! command -v docker >/dev/null 2>&1; then
+    log "docker is required to build the API image, but it is not on PATH" >&2
+    exit 1
+  fi
+
+  log "building local API image ${IMAGE_REPO}:latest (v$version)"
+
+  if ! docker build -f "$PLUGIN_DIR/Dockerfile.runtime" \
+       -t "${IMAGE_REPO}:latest" -t "${IMAGE_REPO}:${version}" "$PLUGIN_DIR"; then
+    log "failed to build API image ${IMAGE_REPO}:${version}" >&2
+    exit 1
+  fi
+
+  log "built ${IMAGE_REPO}:latest (local — no registry; expand references this tag)"
+}
+
+# controller calls the controller's local API. --fail-with-body keeps the
+# controller's error message in the hook output, which the controller
+# returns to `vd plugins:install` when the hook fails.
+controller() {
+  curl -sS --fail-with-body --connect-timeout 5 --max-time 300 "$@"
+}
+
+ensure_api() {
+  local url="${VOODU_CONTROLLER_URL:-}"
+  local ref="${RESOURCE_SCOPE}/${RESOURCE_NAME}"
+  local query="kind=deployment&scope=${RESOURCE_SCOPE}&name=${RESOURCE_NAME}"
+
+  if [ -z "$url" ]; then
+    log "VOODU_CONTROLLER_URL is not set — this controller is too old for this plugin" >&2
+    log "upgrade voodu (v0.18.33 or later), then re-run: vd plugins:install thadeu/voodu-fswapi" >&2
+    exit 1
+  fi
+
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 30 "$url/describe?$query" || true)"
+
+  case "$code" in
+    200)
+      log "$ref exists — restarting it on the rebuilt image (its config is kept)"
+      controller -X POST "$url/restart?$query" >/dev/null
+      ;;
+    404)
+      log "applying $ref with the defaults"
+      controller -X POST "$url/apply" -H 'Content-Type: application/json' \
+        --data "{\"kind\":\"fswapi\",\"scope\":\"${RESOURCE_SCOPE}\",\"name\":\"${RESOURCE_NAME}\",\"spec\":{}}" >/dev/null
+      ;;
+    *)
+      log "could not reach the controller at $url (HTTP ${code:-none})" >&2
+      exit 1
+      ;;
+  esac
+
+  log "$ref is up — the WebUI reaches it at /api/pat/v1/fswapi"
+  log "event_socket password is not ClueCon? vd config:set $ref FREESWITCH_ESL_PASSWORD=<password>"
+}
+
+main() {
+  if [ "$(id -u)" -ne 0 ]; then
+    log "this script must run as root (invoked by controller via plugins:install)"
+    exit 1
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    log "curl is required but not found on PATH" >&2
+    exit 1
+  fi
+
+  install_voodu_fswapi
+  build_api_image
+  ensure_api
+}
+
+main "$@"

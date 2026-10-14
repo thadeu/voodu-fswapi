@@ -1,0 +1,34 @@
+# fswapi.voodu — change a default of the FreeSWITCH API (voodu-fswapi).
+#
+# You do NOT need this file to run the API: `vd plugins:install` already runs
+# it as plugins/fswapi with every default. Apply a block only to change
+# one. Scope and name are fixed: the PAT route /api/pat/v1/fswapi always
+# targets plugins/fswapi, and the controller refuses any other name in the
+# reserved `plugins` scope.
+#
+# The block IS a deployment spec: standard fields (env, resources, …) pass
+# through. Plugin fields: `esl` and `actions`.
+#
+#   vd apply -f fswapi.voodu
+#
+# The event_socket password never goes here:
+#
+#   vd config:set plugins/fswapi FREESWITCH_ESL_PASSWORD=<password>
+
+fswapi "plugins" "fswapi" {
+  # FreeSWITCH runs with network_mode = "host"; voodu adds
+  # host.docker.internal to every container, so the event socket on the
+  # host is reachable from voodu0. This is the default — shown for clarity.
+  esl = "host.docker.internal:8021"
+
+  # Actions are OFF until listed here. Add "reloadxml", "reloadacl",
+  # "hupall" or "uuid_kill" when you need them.
+  actions = ["reloadxml"]
+
+  resources {
+    limits {
+      cpu    = "0.2"
+      memory = "64Mi"
+    }
+  }
+}

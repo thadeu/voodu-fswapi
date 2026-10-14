@@ -1,0 +1,17 @@
+# Runtime image for the voodu-fswapi API. Built LOCALLY by the install
+# hook from the already-installed plugin binary — never pushed to a public
+# registry. The build context is the plugin's install dir (bin/voodu-fswapi).
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates \
+ && addgroup -g 10002 -S fswapi \
+ && adduser -u 10002 -S -G fswapi fswapi
+
+COPY bin/voodu-fswapi /usr/local/bin/voodu-fswapi
+
+# Internal HTTP on voodu0 only; the controller PAT proxy reaches it.
+# NOT 8080 — that port is already used inside the platform.
+EXPOSE 8721
+USER fswapi
+
+ENTRYPOINT ["voodu-fswapi", "serve"]

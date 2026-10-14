@@ -1,0 +1,41 @@
+name: fswapi
+version: 0.1.0
+description: >
+  Voodu plugin for FreeSWITCH. Installing it runs a small JSON API over
+  FreeSWITCH's event socket (mod_event_socket) as the builtin resource
+  plugins/fswapi, with defaults: status, calls, channels, registrations,
+  sofia profiles/gateways, plus allowlisted actions (reloadxml, reloadacl,
+  hupall, uuid_kill) that are OFF until the operator enables them. Change a
+  default with `fswapi "plugins" "fswapi" { ... }`. Built from a LOCAL image
+  (the plugin binary + a runtime Dockerfile), no public registry.
+homepage: https://github.com/thadeu/voodu-fswapi
+
+entrypoint: bin/voodu-fswapi
+
+# Expose the API through the controller's authenticated PAT plane. builtin:
+# the route has one fixed target, plugins/fswapi (the resource the install
+# hook applies), so the URL carries no scope or name:
+#
+#   /api/pat/v1/fswapi/<route>  →  plugins/fswapi, port from
+#                                      FREESWITCH_API_ADDR (default 8721)
+#
+# GET needs the PAT `read` scope; POST (actions) needs `actions` and is
+# rate-limited per PAT by the controller.
+routes:
+  prefix: fswapi
+  port_env: FREESWITCH_API_ADDR
+  builtin: true
+
+commands:
+  - name: help
+    help: Plugin overview — manifest, deploy flow, API surface.
+
+  - name: expand
+    help: >
+      (Internal.) Macro entrypoint invoked by the controller during apply.
+      Emits the API deployment plugins/fswapi (local image).
+
+  - name: serve
+    help: >
+      (Internal.) Run the API server. This is the ENTRYPOINT of the
+      locally-built image — operators don't run it directly.
