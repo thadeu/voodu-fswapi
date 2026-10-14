@@ -28,7 +28,10 @@ const (
 	// DefaultAddr is NOT 8080: that port is already taken inside the
 	// platform, and a fixed, distinct port keeps the two apart even when a
 	// pod ends up on the host network.
-	DefaultAddr    = "0.0.0.0:8721"
+	DefaultAddr = "0.0.0.0:8721"
+
+	// DefaultESLAddr is the event socket of a FreeSWITCH on the host network:
+	// voodu maps host.docker.internal to the host in every container.
 	DefaultESLAddr = "host.docker.internal:8021"
 
 	// DefaultESLPassword is FreeSWITCH's shipped event_socket password.
