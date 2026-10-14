@@ -33,4 +33,10 @@ fswapi "plugins" "fswapi" {
       memory = "256Mi"
     }
   }
+
+  # Default: 2 files of 25m. This block replaces it whole, so set both.
+  logs {
+    max_size  = "50m"
+    max_files = 3
+  }
 }

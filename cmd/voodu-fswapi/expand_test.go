@@ -75,6 +75,12 @@ func TestExpand_Defaults(t *testing.T) {
 	if limits["cpu"] != "0.3" || limits["memory"] != "128Mi" {
 		t.Errorf("resources limits = %v, want cpu 0.3 / memory 128Mi", limits)
 	}
+
+	logs := m.Spec["logs"].(map[string]any)
+
+	if logs["max_size"] != "25m" || logs["max_files"] != 2 {
+		t.Errorf("logs = %v, want 2 files of 25m", logs)
+	}
 }
 
 func TestExpand_PluginFieldsBecomeEnvAndAreStripped(t *testing.T) {
@@ -100,7 +106,7 @@ func TestExpand_PluginFieldsBecomeEnvAndAreStripped(t *testing.T) {
 }
 
 func TestExpand_OperatorWins(t *testing.T) {
-	p, err := expandFromJSON(t, `{"image":"my/fs-api:1","env":{"FREESWITCH_API_ADDR":"0.0.0.0:9000"},"resources":{"limits":{"memory":"64Mi"}}}`)
+	p, err := expandFromJSON(t, `{"image":"my/fs-api:1","env":{"FREESWITCH_API_ADDR":"0.0.0.0:9000"},"resources":{"limits":{"memory":"64Mi"}},"logs":{"max_size":"100m","max_files":5}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,6 +130,10 @@ func TestExpand_OperatorWins(t *testing.T) {
 
 	if _, ok := limits["cpu"]; ok {
 		t.Errorf("the default is replaced whole, not merged: %v", limits)
+	}
+
+	if logs := m.Spec["logs"].(map[string]any); logs["max_size"] != "100m" || logs["max_files"] != float64(5) {
+		t.Errorf("the operator's logs must replace the default: %v", logs)
 	}
 }
 

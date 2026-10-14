@@ -23,6 +23,7 @@ Change a default only when you need to:
     esl     = "host.docker.internal:8021"   # default
     actions = ["reloadxml"]                 # default: none enabled
     resources { limits { cpu = "0.5", memory = "256Mi" } }   # default: 0.3 / 128Mi
+    logs { max_size = "50m", max_files = 3 }                 # default: 25m x 2
   }
 
 Reads:    /overview /status /calls /calls/count /channels /channels/count

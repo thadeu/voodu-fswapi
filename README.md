@@ -105,6 +105,11 @@ fswapi "plugins" "fswapi" {
   resources {
     limits { cpu = "0.5", memory = "256Mi" }   # default: cpu 0.3, memory 128Mi
   }
+
+  logs {
+    max_size  = "50m"                          # default: 25m
+    max_files = 3                              # default: 2
+  }
 }
 ```
 
@@ -117,8 +122,9 @@ The block **is a deployment spec**: standard fields pass through untouched.
 image, `FREESWITCH_API_ADDR` (`0.0.0.0:8721` — **not 8080**, which is already
 used inside the platform), `FREESWITCH_ESL_ADDR` (from `esl`),
 `FREESWITCH_ACTIONS` (from `actions`), a `/health` check and the resource
-limits (`cpu = "0.3"`, `memory = "128Mi"`). A `resources` block replaces the
-default limits whole: set both values when you change one.
+limits (`cpu = "0.3"`, `memory = "128Mi"`) and the log cap (2 files of
+`25m`). A `resources` or `logs` block replaces its default whole: set both
+values when you change one.
 
 | Field | Plugin-only | Meaning |
 | --- | --- | --- |

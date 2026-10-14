@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/). The tag must match
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-14
+
+### Changed
+
+- The API deployment gets a default log cap: 2 files of `25m`. A `logs`
+  block in `fswapi "plugins" "fswapi"` replaces it.
+
 ## [0.1.1] - 2026-10-14
 
 ### Changed

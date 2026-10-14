@@ -72,6 +72,7 @@ func cmdExpand() error {
 //   - replicas     → 1 (operator may override)
 //   - resources    → limits cpu 0.3, memory 128Mi (operator's block replaces
 //     it whole)
+//   - logs         → 2 files of 25m (operator's block replaces it whole)
 //   - env          → FREESWITCH_API_ADDR, FREESWITCH_ESL_ADDR (from `esl`),
 //     FREESWITCH_ACTIONS (from `actions`), merged UNDER the operator's env
 //   - health_check → wget /health (operator may override)
@@ -122,6 +123,10 @@ func buildExpand(scope, name string, spec map[string]any) (expandedPayload, erro
 		dep["resources"] = defaultResources()
 	}
 
+	if _, ok := dep["logs"]; !ok {
+		dep["logs"] = defaultLogs()
+	}
+
 	env := map[string]any{
 		"FREESWITCH_API_ADDR": api.DefaultAddr,
 		"FREESWITCH_ESL_ADDR": eslAddr,
@@ -153,6 +158,12 @@ func defaultResources() map[string]any {
 	return map[string]any{
 		"limits": map[string]any{"cpu": "0.3", "memory": "128Mi"},
 	}
+}
+
+// defaultLogs caps the API's docker log at 2 files of 25m (~50MB): one line
+// per request, plus every action attempt. Change it with a `logs` block.
+func defaultLogs() map[string]any {
+	return map[string]any{"max_size": "25m", "max_files": 2}
 }
 
 func portOf(addr, def string) string {
