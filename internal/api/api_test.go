@@ -348,3 +348,44 @@ func TestDefaultGateway(t *testing.T) {
 		t.Errorf("default sources = %v, %v", prefixes, err)
 	}
 }
+
+// One channel's SIP Call-ID, read on demand: the key HEP3 files the call under.
+func TestServer_SipCallID(t *testing.T) {
+	const uuid = "0b7a8f2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b"
+
+	runner := &fakeRunner{replies: map[string]string{
+		"uuid_getvar " + uuid + " sip_call_id": "a84b4c76e66710@pbx.example\n",
+	}}
+
+	rec := do(newTestServer(t, runner, ""), http.MethodGet, "/channels/"+strings.ToUpper(uuid)+"/sip_call_id", "", "")
+
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"sip_call_id":"a84b4c76e66710@pbx.example"`) {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+
+	if len(runner.ran) != 1 || runner.ran[0] != "uuid_getvar "+uuid+" sip_call_id" {
+		t.Errorf("ran %v, want exactly one uuid_getvar on the lower-cased uuid", runner.ran)
+	}
+}
+
+func TestServer_SipCallIDMissingAndInvalid(t *testing.T) {
+	const uuid = "0b7a8f2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b"
+
+	for reply, want := range map[string]int{"_undef_": http.StatusNotFound, "-ERR No such channel!\n": http.StatusNotFound} {
+		runner := &fakeRunner{replies: map[string]string{"uuid_getvar " + uuid + " sip_call_id": reply}}
+
+		if rec := do(newTestServer(t, runner, ""), http.MethodGet, "/channels/"+uuid+"/sip_call_id", "", ""); rec.Code != want {
+			t.Errorf("reply %q: status = %d, want %d", reply, rec.Code, want)
+		}
+	}
+
+	runner := &fakeRunner{}
+
+	if rec := do(newTestServer(t, runner, ""), http.MethodGet, "/channels/not-a-uuid/sip_call_id", "", ""); rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("invalid uuid: status = %d, want 422", rec.Code)
+	}
+
+	if len(runner.ran) != 0 {
+		t.Errorf("an invalid uuid must never reach ESL, ran %v", runner.ran)
+	}
+}

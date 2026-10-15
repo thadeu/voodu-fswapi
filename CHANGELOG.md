@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/). The tag must match
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-15
+
+### Added
+
+- `GET /channels/{uuid}/sip_call_id`: one channel's SIP Call-ID
+  (`uuid_getvar`), read on demand. The WebUI uses it to open a live call's
+  SIP flow in HEP3; `show channels` does not carry the Call-ID.
+
 ## [0.1.2] - 2026-10-14
 
 ### Changed

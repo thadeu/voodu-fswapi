@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"strings"
 
 	"github.com/thadeu/voodu-fswapi/internal/esl"
 )
@@ -54,6 +55,7 @@ func NewServer(esl Runner, actions Actions, sources []netip.Prefix, logger *log.
 //	GET  /status                 `status`, parsed
 //	GET  /calls, /calls/count    `show calls as json` / `show calls count`
 //	GET  /channels, /channels/count
+//	GET  /channels/{uuid}/sip_call_id  `uuid_getvar <uuid> sip_call_id`
 //	GET  /registrations          `show registrations as json`
 //	GET  /sofia                  `sofia xmlstatus` (profiles, gateways)
 //	GET  /actions                every action + whether it is enabled
@@ -72,6 +74,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /calls/count", s.count("show calls count"))
 	mux.HandleFunc("GET /channels", s.rows("show channels as json"))
 	mux.HandleFunc("GET /channels/count", s.count("show channels count"))
+	mux.HandleFunc("GET /channels/{uuid}/sip_call_id", s.sipCallID)
 	mux.HandleFunc("GET /registrations", s.rows("show registrations as json"))
 	mux.HandleFunc("GET /sofia", s.sofia)
 	mux.HandleFunc("GET /actions", func(w http.ResponseWriter, _ *http.Request) {
@@ -155,6 +158,40 @@ func (s *Server) rows(cmd string) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, rows)
 	}
+}
+
+// sipCallID — the SIP Call-ID of ONE channel: the key a SIP capture (HEP3)
+// files the call under. `show channels` does not carry it, and reading it for
+// every channel would cost one ESL command each on every poll, so it is asked
+// for one channel, when someone wants that call's SIP flow.
+//
+// 404 when the channel is gone (or never had a SIP dialog: a loopback leg has
+// no Call-ID); 422 for a uuid that is not one.
+func (s *Server) sipCallID(w http.ResponseWriter, r *http.Request) {
+	uuid := strings.ToLower(r.PathValue("uuid"))
+
+	if !reUUID.MatchString(uuid) {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Errorf("invalid channel uuid %q", r.PathValue("uuid")))
+
+		return
+	}
+
+	replies, err := s.esl.API(r.Context(), "uuid_getvar "+uuid+" sip_call_id")
+	if err != nil {
+		s.eslFailed(w, err)
+
+		return
+	}
+
+	value := strings.TrimSpace(replies[0])
+
+	if value == "" || value == "_undef_" || strings.HasPrefix(value, "-ERR") {
+		writeError(w, http.StatusNotFound, fmt.Errorf("channel %s has no SIP Call-ID (gone, or not a SIP leg)", uuid))
+
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"uuid": uuid, "sip_call_id": value})
 }
 
 func (s *Server) sofia(w http.ResponseWriter, r *http.Request) {

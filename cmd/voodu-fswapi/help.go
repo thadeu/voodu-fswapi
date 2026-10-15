@@ -27,7 +27,7 @@ Change a default only when you need to:
   }
 
 Reads:    /overview /status /calls /calls/count /channels /channels/count
-          /registrations /sofia /actions
+          /channels/{uuid}/sip_call_id /registrations /sofia /actions
 Actions:  POST /actions/{reloadxml|reloadacl|hupall}  POST /calls/{uuid}/kill
           (each OFF until listed in ` + "`actions`" + `)
 

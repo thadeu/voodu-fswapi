@@ -151,6 +151,7 @@ All routes are reached through the controller PAT proxy:
 | `/status` | `status` | uptime, version, sessions (now / peak / since start), sessions per second, max, idle CPU, and the raw text |
 | `/calls` · `/calls/count` | `show calls as json` · `show calls count` | bridged calls (A↔B = 1) |
 | `/channels` · `/channels/count` | `show channels as json` · `show channels count` | call legs (A↔B = 2) |
+| `/channels/{uuid}/sip_call_id` | `uuid_getvar <uuid> sip_call_id` | one channel's SIP Call-ID — the key a SIP capture (HEP3) files the call under; 404 when the channel is gone or not a SIP leg |
 | `/registrations` | `show registrations as json` | registered endpoints |
 | `/sofia` | `sofia xmlstatus` | profiles, gateways and aliases with their state |
 | `/actions` | — | every action, with `enabled` and `destructive` |
